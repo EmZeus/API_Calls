@@ -294,3 +294,9 @@ app.get('/api/current-positions', async (req, res) => {
     if (connection) await connection.end();
   }
 });
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
