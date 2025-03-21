@@ -314,6 +314,79 @@ app.get('/api/current-positions', async (req, res) => {
   }
 });
 
+app.get('/api/weekly-fuel-average', async (req, res) => {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+
+    // Extract query parameters
+    const { deviceid, startDate, endDate } = req.query;
+
+    if (!deviceid) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    // Base query grouping by week (YEARWEEK).
+    // Using YEARWEEK(day, 1) to treat Monday as the first day of the week.
+    // If your MySQL version is older or you prefer Sunday-based weeks, omit the ", 1".
+    let query = `
+      SELECT 
+        YEARWEEK(day, 1) AS yearweek,
+        MIN(day) AS week_start,
+        MAX(day) AS week_end,
+        SUM(daily_distance) AS total_distance,
+        SUM(daily_running_consumption) AS total_consumption,
+        /* 
+           If total_consumption is > 0, compute the ratio;
+           else 0 to avoid division by zero.
+        */
+        CASE 
+          WHEN SUM(daily_running_consumption) > 0 
+          THEN ROUND(SUM(daily_distance) / SUM(daily_running_consumption), 2)
+          ELSE 0
+        END AS fuel_average
+      FROM tc_computed_data
+      WHERE deviceid = ?
+    `;
+
+    const queryParams = [deviceid];
+
+    // Optionally filter by startDate / endDate
+    if (startDate && endDate) {
+      query += ` AND day BETWEEN ? AND ?`;
+      queryParams.push(startDate, endDate);
+    } else if (startDate) {
+      query += ` AND day >= ?`;
+      queryParams.push(startDate);
+    } else if (endDate) {
+      query += ` AND day <= ?`;
+      queryParams.push(endDate);
+    }
+
+    // Group by the weekly partition
+    query += `
+      GROUP BY YEARWEEK(day, 1)
+      ORDER BY week_start ASC
+    `;
+
+    // Execute the query
+    const [rows] = await connection.execute(query, queryParams);
+
+    // If no data found, return an empty array or a custom message
+    if (!rows.length) {
+      return res.json([]);
+    }
+
+    res.json(rows); // Return the grouped data as JSON
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
