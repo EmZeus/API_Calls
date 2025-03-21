@@ -152,13 +152,14 @@ app.get('/api/fuel-average', async (req, res) => {
       return res.status(400).json({ error: "Device ID is required" });
     }
 
+    // Updated column names in SELECT
     let query = `
       SELECT 
         SUM(daily_distance) AS total_distance, 
         SUM(daily_running_consumption) AS total_consumption,
-        SUM(engine_on_hours) AS total_engine_on_hours,
-        SUM(system_on_hours) AS total_system_on_hours,
-        SUM(engine_idle_time) AS total_engine_idle_time,
+        SUM(engine_running_hours) AS total_engine_running_hours,
+        SUM(system_running_hours) AS total_system_running_hours,
+        SUM(engine_idle_running_time) AS total_engine_idle_running_time,
         SUM(system_off_hours) AS total_system_off_hours
       FROM tc_computed_data 
       WHERE deviceid = ?
@@ -176,25 +177,42 @@ app.get('/api/fuel-average', async (req, res) => {
 
     // Execute the query
     const [rows] = await connection.execute(query, queryParams);
-    
+
+    // If no rows, return zeroed data
+    if (!rows.length) {
+      return res.json({
+        deviceid,
+        total_distance: 0,
+        total_consumption: 0,
+        fuel_average: 0,
+        total_engine_running_hours: 0,
+        total_system_running_hours: 0,
+        total_engine_idle_running_time: 0,
+        total_system_off_hours: 0
+      });
+    }
+
+    // Extract row data
     const totalDistance = rows[0].total_distance || 0;
     const totalConsumption = rows[0].total_consumption || 0;
-    const totalEngineOnHours = rows[0].total_engine_on_hours || 0;
-    const totalSystemOnHours = rows[0].total_system_on_hours || 0;
-    const totalEngineIdleTime = rows[0].total_engine_idle_time || 0;
+    const totalEngineRunningHours = rows[0].total_engine_running_hours || 0;
+    const totalSystemRunningHours = rows[0].total_system_running_hours || 0;
+    const totalEngineIdleRunningTime = rows[0].total_engine_idle_running_time || 0;
     const totalSystemOffHours = rows[0].total_system_off_hours || 0;
-    
+
     // Calculate fuel average (distance per unit of fuel)
-    const fuelAverage = totalConsumption > 0 ? (totalDistance / totalConsumption).toFixed(2) : 0;
+    const fuelAverage = totalConsumption > 0 
+      ? (totalDistance / totalConsumption).toFixed(2) 
+      : 0;
 
     res.json({ 
       deviceid, 
       total_distance: totalDistance, 
       total_consumption: totalConsumption, 
       fuel_average: fuelAverage,
-      total_engine_on_hours: totalEngineOnHours,
-      total_system_on_hours: totalSystemOnHours,
-      total_engine_idle_time: totalEngineIdleTime,
+      total_engine_running_hours: totalEngineRunningHours,
+      total_system_running_hours: totalSystemRunningHours,
+      total_engine_idle_running_time: totalEngineIdleRunningTime,
       total_system_off_hours: totalSystemOffHours
     });
 
@@ -204,6 +222,7 @@ app.get('/api/fuel-average', async (req, res) => {
     if (connection) await connection.end();
   }
 });
+
 
 app.get('/api/average-metrics', async (req, res) => {
   let connection;
