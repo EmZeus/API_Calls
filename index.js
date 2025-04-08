@@ -50,8 +50,8 @@ app.get('/api/devices', async (req, res) => {
   try {
     connection = await mysql.createConnection(dbConfig);
     
-    // Fetching all records from tc_computed_data ordered by deviceid
-    const [rows] = await connection.execute("SELECT name FROM `tc_devices` ORDER BY name ASC");
+    // Fetching device id (as `id`) and name from tc_devices
+    const [rows] = await connection.execute("SELECT id, name FROM `tc_devices` ORDER BY name ASC");
     
     res.json(rows); // Send data as JSON
   } catch (err) {
@@ -60,6 +60,7 @@ app.get('/api/devices', async (req, res) => {
     if (connection) await connection.end();
   }
 });
+
 
 app.get('/api/distance', async (req, res) => {
   let connection;
