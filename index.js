@@ -51,7 +51,7 @@ app.get('/api/devices', async (req, res) => {
     connection = await mysql.createConnection(dbConfig);
     
     // Fetching device id (as `id`) and name from tc_devices
-    const [rows] = await connection.execute("SELECT id, name FROM `tc_devices` ORDER BY name ASC");
+    const [rows] = await connection.execute("SELECT id, name FROM `tc_devices` ORDER BY id ASC");
     
     res.json(rows); // Send data as JSON
   } catch (err) {
