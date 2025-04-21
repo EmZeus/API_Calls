@@ -367,11 +367,9 @@ app.get('/api/current-week-fuel-average', async (req, res) => {
     if (!deviceid) {
       return res.status(400).json({ error: "Device ID is required" });
     }
-    
-    // Query to get daily fuel averages for the current week.
-    // WEEK(day,1) uses Monday as the first day of the week.
+
     const query = `
-      SELECT day, Fuel_Avg AS fuel_average
+      SELECT day, ROUND(Fuel_Avg, 2) AS fuel_average
       FROM tc_computed_data
       WHERE deviceid = ?
         AND WEEK(day, 1) = WEEK(CURDATE(), 1)
@@ -379,16 +377,22 @@ app.get('/api/current-week-fuel-average', async (req, res) => {
         AND Fuel_Avg <> 0
       ORDER BY day ASC
     `;
-    
+
     const [rows] = await connection.execute(query, [deviceid]);
-    
-    res.json(rows); // Return the daily averages (up to 7 records)
+
+    const result = rows.map(row => ({
+      day: row.day,
+      fuel_average: row.fuel_average !== null ? Number(row.fuel_average) : 0
+    }));
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
     if (connection) await connection.end();
   }
 });
+
 
 
 
