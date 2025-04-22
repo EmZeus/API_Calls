@@ -393,6 +393,42 @@ app.get('/api/current-week-fuel-average', async (req, res) => {
   }
 });
 
+app.get('/api/last-7-days-fuel-average', async (req, res) => {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    
+    const { deviceid } = req.query;
+    if (!deviceid) {
+      return res.status(400).json({ error: "Device ID is required" });
+    }
+
+    const query = `
+      SELECT day, ROUND(Fuel_Avg, 2) AS fuel_average
+      FROM tc_computed_data
+      WHERE deviceid = ?
+        AND day >= CURDATE() - INTERVAL 6 DAY
+        AND day <= CURDATE()
+        AND Fuel_Avg <> 0
+      ORDER BY day ASC
+    `;
+
+    const [rows] = await connection.execute(query, [deviceid]);
+
+    const result = rows.map(row => ({
+      day: row.day,
+      fuel_average: row.fuel_average !== null ? Number(row.fuel_average) : 0
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+
 
 
 
